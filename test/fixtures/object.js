@@ -24,7 +24,7 @@
   Infinity: Infinity,
   newlines: "foo\nbar\r\nbaz",
   circular: "[Circular]",
-  Symbol(): Symbol(),
-  Symbol(foo): Symbol(foo),
-  Symbol(foo): Symbol(foo)
+  [Symbol()]: Symbol(),
+  [Symbol("foo")]: Symbol("foo"),
+  [Symbol.for("foo")]: Symbol.for("foo")
 }
