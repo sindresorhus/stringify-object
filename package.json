@@ -3,8 +3,8 @@
 	"version": "5.0.0",
 	"description": "Stringify an object/array like JSON.stringify just without all the double-quotes",
 	"license": "BSD-2-Clause",
-	"repository": "yeoman/stringify-object",
-	"funding": "https://github.com/yeoman/stringify-object?sponsor=1",
+	"repository": "sindresorhus/stringify-object",
+	"funding": "https://github.com/sponsors/sindresorhus",
 	"author": {
 		"name": "Sindre Sorhus",
 		"email": "sindresorhus@gmail.com",
@@ -12,6 +12,7 @@
 	},
 	"type": "module",
 	"exports": "./index.js",
+	"sideEffects": false,
 	"engines": {
 		"node": ">=14.16"
 	},
