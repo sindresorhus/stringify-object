@@ -61,18 +61,24 @@ export default function stringifyObject(input, options, pad) {
 		}
 
 		if (typeof input === 'symbol') {
-			const t = input.description;
-			if (t === undefined) return 'Symbol()';
-			if (t.slice(0,7) === 'Symbol.'
-				&& Symbol[t.slice(7)] === input
+			const {description} = input;
+			if (description === undefined) {
+				return 'Symbol()';
+			}
+
+			if (
+				description?.startsWith('Symbol.')
+					&& Symbol[description.slice(7)] === input
 			) {
-				return t;
+				return description;
 			}
-			const q = stringify(t, options);
+
+			const quotedDescription = stringify(description, options);
 			if (Symbol.keyFor(input) !== undefined) {
-				return `Symbol.for(${q})`;
+				return `Symbol.for(${quotedDescription})`;
 			}
-			return `Symbol(${q})`;
+
+			return `Symbol(${quotedDescription})`;
 		}
 
 		if (input instanceof Date) {
@@ -120,9 +126,15 @@ export default function stringifyObject(input, options, pad) {
 				const eol = objectKeys.length - 1 === index ? tokens.newline : ',' + tokens.newlineOrSpace;
 				const isSymbol = typeof element === 'symbol';
 				const isClassic = !isSymbol && /^[a-z$_][$\w]*$/i.test(element);
+
 				let key = element;
-				if (!isClassic) key = stringify(element, options);
-				if (isSymbol) key = '[' + key + ']';
+				if (!isClassic) {
+					key = stringify(element, options);
+				}
+
+				if (isSymbol) {
+					key = `[${key}]`;
+				}
 
 				let value = stringify(input[element], options, pad + indent);
 				if (options.transform) {

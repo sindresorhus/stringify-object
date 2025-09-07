@@ -201,12 +201,53 @@ test('don\'t stringify non-enumerable symbols', t => {
 
 	t.is(stringifyObject(object), '{\n\t[Symbol(\'for enumerable key\')]: undefined\n}');
 });
+
 test('handle symbols', t => {
 	const object = {
 		[Symbol('unique')]: Symbol('unique'),
 		[Symbol.for('registry')]: [Symbol.for('registry'), 2],
 		[Symbol.iterator]: {k: Symbol.iterator},
-		[Symbol()]: 'undef'
+		[Symbol()]: 'undef', // eslint-disable-line symbol-description
 	};
 	t.is(stringifyObject(object), '{\n\t[Symbol(\'unique\')]: Symbol(\'unique\'),\n\t[Symbol.for(\'registry\')]: [\n\t\tSymbol.for(\'registry\'),\n\t\t2\n\t],\n\t[Symbol.iterator]: {\n\t\tk: Symbol.iterator\n\t},\n\t[Symbol()]: \'undef\'\n}');
+
+	// Anonymous symbol (no description)
+	t.is(stringifyObject(Symbol()), 'Symbol()'); // eslint-disable-line symbol-description
+
+	// Symbol with empty string description
+	t.is(stringifyObject(Symbol('')), 'Symbol(\'\')');
+
+	// Symbol.for with empty string
+	t.is(stringifyObject(Symbol.for('')), 'Symbol.for(\'\')');
+
+	// Test as object keys
+	const emptySymbolKeys = {
+		[Symbol()]: 'anonymous', // eslint-disable-line symbol-description
+		[Symbol('')]: 'empty string',
+		[Symbol.for('')]: 'empty for',
+	};
+	t.regex(stringifyObject(emptySymbolKeys), /\[Symbol\(\)]/);
+	t.regex(stringifyObject(emptySymbolKeys), /\[Symbol\(''\)]/);
+	t.regex(stringifyObject(emptySymbolKeys), /\[Symbol\.for\(''\)]/);
+
+	// Symbol escaping with special characters
+	const symbolWithSpecialChars = Symbol('a"b\\c\n');
+	t.is(stringifyObject(symbolWithSpecialChars), 'Symbol(\'a"b\\\\c\\n\')');
+	t.is(stringifyObject(symbolWithSpecialChars, {singleQuotes: false}), 'Symbol("a\\"b\\\\c\\n")');
+
+	const specialCharKey = {
+		[Symbol('a"b\\c\n')]: 'value',
+	};
+	t.regex(stringifyObject(specialCharKey), /\[Symbol\('a"b\\\\c\\n'\)]/);
+
+	// Well-known symbols
+	t.is(stringifyObject(Symbol.iterator), 'Symbol.iterator');
+	t.is(stringifyObject(Symbol.hasInstance), 'Symbol.hasInstance');
+	t.is(stringifyObject(Symbol.toStringTag), 'Symbol.toStringTag');
+
+	// Look-alike symbols (not real well-known symbols)
+	t.is(stringifyObject(Symbol('Symbol.iterator')), 'Symbol(\'Symbol.iterator\')');
+	t.is(stringifyObject(Symbol('Symbol.hasInstance')), 'Symbol(\'Symbol.hasInstance\')');
+	t.is(stringifyObject(Symbol('Symbol.toStringTag')), 'Symbol(\'Symbol.toStringTag\')');
+});
 });
