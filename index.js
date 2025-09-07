@@ -55,10 +55,24 @@ export default function stringifyObject(input, options, pad) {
 			|| typeof input === 'number'
 			|| typeof input === 'boolean'
 			|| typeof input === 'function'
-			|| typeof input === 'symbol'
 			|| isRegexp(input)
 		) {
 			return String(input);
+		}
+
+		if (typeof input === 'symbol') {
+			const t = input.description;
+			if (t === undefined) return 'Symbol()';
+			if (t.slice(0,7) === 'Symbol.'
+				&& Symbol[t.slice(7)] === input
+			) {
+				return t;
+			}
+			const q = stringify(t, options);
+			if (Symbol.keyFor(input) !== undefined) {
+				return `Symbol.for(${q})`;
+			}
+			return `Symbol(${q})`;
 		}
 
 		if (input instanceof Date) {
@@ -106,7 +120,9 @@ export default function stringifyObject(input, options, pad) {
 				const eol = objectKeys.length - 1 === index ? tokens.newline : ',' + tokens.newlineOrSpace;
 				const isSymbol = typeof element === 'symbol';
 				const isClassic = !isSymbol && /^[a-z$_][$\w]*$/i.test(element);
-				const key = isSymbol || isClassic ? element : stringify(element, options);
+				let key = element;
+				if (!isClassic) key = stringify(element, options);
+				if (isSymbol) key = '[' + key + ']';
 
 				let value = stringify(input[element], options, pad + indent);
 				if (options.transform) {

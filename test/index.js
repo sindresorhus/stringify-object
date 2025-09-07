@@ -199,5 +199,14 @@ test('don\'t stringify non-enumerable symbols', t => {
 	const symbol = Symbol('for non-enumerable key');
 	Object.defineProperty(object, symbol, {enumerable: false});
 
-	t.is(stringifyObject(object), '{\n\tSymbol(for enumerable key): undefined\n}');
+	t.is(stringifyObject(object), '{\n\t[Symbol(\'for enumerable key\')]: undefined\n}');
+});
+test('handle symbols', t => {
+	const object = {
+		[Symbol('unique')]: Symbol('unique'),
+		[Symbol.for('registry')]: [Symbol.for('registry'), 2],
+		[Symbol.iterator]: {k: Symbol.iterator},
+		[Symbol()]: 'undef'
+	};
+	t.is(stringifyObject(object), '{\n\t[Symbol(\'unique\')]: Symbol(\'unique\'),\n\t[Symbol.for(\'registry\')]: [\n\t\tSymbol.for(\'registry\'),\n\t\t2\n\t],\n\t[Symbol.iterator]: {\n\t\tk: Symbol.iterator\n\t},\n\t[Symbol()]: \'undef\'\n}');
 });
