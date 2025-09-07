@@ -1,15 +1,16 @@
 import isRegexp from 'is-regexp';
 import isObject from 'is-obj';
 import getOwnEnumerableKeys from 'get-own-enumerable-keys';
+import isIdentifier from 'is-identifier';
 
 const CHARACTER_ESCAPES = {
-	'\n': '\\n',
-	'\r': '\\r',
-	'\t': '\\t',
-	'\b': '\\b',
-	'\f': '\\f',
-	'\v': '\\v',
-	'\0': '\\0',
+	'\n': String.raw`\n`,
+	'\r': String.raw`\r`,
+	'\t': String.raw`\t`,
+	'\b': String.raw`\b`,
+	'\f': String.raw`\f`,
+	'\v': String.raw`\v`,
+	'\0': String.raw`\0`,
 };
 
 export default function stringifyObject(input, options, pad) {
@@ -41,90 +42,92 @@ export default function stringifyObject(input, options, pad) {
 			}
 
 			const oneLined = string
-				.replace(new RegExp(tokens.newline, 'g'), '')
-				.replace(new RegExp(tokens.newlineOrSpace, 'g'), ' ')
-				.replace(new RegExp(tokens.pad + '|' + tokens.indent, 'g'), '');
+				.replaceAll(tokens.newline, '')
+				.replaceAll(tokens.newlineOrSpace, ' ')
+				.replaceAll(tokens.pad, '')
+				.replaceAll(tokens.indent, '');
 
 			if (oneLined.length <= options.inlineCharacterLimit) {
 				return oneLined;
 			}
 
 			return string
-				.replace(new RegExp(tokens.newline + '|' + tokens.newlineOrSpace, 'g'), '\n')
-				.replace(new RegExp(tokens.pad, 'g'), pad)
-				.replace(new RegExp(tokens.indent, 'g'), pad + indent);
+				.replaceAll(tokens.newline, '\n')
+				.replaceAll(tokens.newlineOrSpace, '\n')
+				.replaceAll(tokens.pad, pad)
+				.replaceAll(tokens.indent, pad + indent);
 		};
 
 		if (seen.includes(input)) {
 			return '"[Circular]"';
 		}
 
+		const type = typeof input;
+
 		if (
 			input === null
 			|| input === undefined
-			|| typeof input === 'number'
-			|| typeof input === 'boolean'
-			|| typeof input === 'function'
+			|| type === 'number'
+			|| type === 'boolean'
+			|| type === 'function'
 			|| isRegexp(input)
 		) {
 			return String(input);
 		}
 
-		if (typeof input === 'symbol') {
+		if (type === 'bigint') {
+			return String(input) + 'n';
+		}
+
+		if (type === 'symbol') {
 			const {description} = input;
+
 			if (description === undefined) {
 				return 'Symbol()';
 			}
 
-			if (
-				description?.startsWith('Symbol.')
-					&& Symbol[description.slice(7)] === input
-			) {
+			// Check for well-known symbols first
+			if (description?.startsWith('Symbol.') && Symbol[description.slice(7)] === input) {
 				return description;
 			}
 
-			const quotedDescription = stringify(description, options);
-			if (Symbol.keyFor(input) !== undefined) {
-				return `Symbol.for(${quotedDescription})`;
+			// Check if it's a global registry symbol
+			const globalKey = Symbol.keyFor(input);
+			if (globalKey !== undefined) {
+				return `Symbol.for(${stringify(globalKey, options)})`;
 			}
 
-			return `Symbol(${quotedDescription})`;
+			return `Symbol(${stringify(description, options)})`;
 		}
 
 		if (input instanceof Date) {
-			return `new Date('${input.toISOString()}')`;
+			return Number.isNaN(input.getTime())
+				? 'new Date(\'Invalid Date\')'
+				: `new Date('${input.toISOString()}')`;
 		}
 
-		if (input instanceof Map) {
+		if (input instanceof Map || input instanceof Set) {
+			const isMap = input instanceof Map;
+			const name = isMap ? 'Map' : 'Set';
+
 			if (input.size === 0) {
-				return 'new Map()';
+				return `new ${name}()`;
 			}
 
 			seen.push(input);
 
-			const entries = [...input].map(([key, value]) =>
-				tokens.indent + `[${stringify(key, options, pad + indent)}, ${stringify(value, options, pad + indent)}]`,
-			).join(',' + tokens.newlineOrSpace);
+			const items = [...input].map(item => {
+				if (isMap) {
+					const [key, value] = item;
+					return tokens.indent + `[${stringify(key, options, pad + indent)}, ${stringify(value, options, pad + indent)}]`;
+				}
+
+				return tokens.indent + stringify(item, options, pad + indent);
+			}).join(',' + tokens.newlineOrSpace);
 
 			seen.pop();
 
-			return expandWhiteSpace(`new Map([${tokens.newline}${entries}${tokens.newline}${tokens.pad}])`);
-		}
-
-		if (input instanceof Set) {
-			if (input.size === 0) {
-				return 'new Set()';
-			}
-
-			seen.push(input);
-
-			const values = [...input].map(value =>
-				tokens.indent + stringify(value, options, pad + indent),
-			).join(',' + tokens.newlineOrSpace);
-
-			seen.pop();
-
-			return expandWhiteSpace(`new Set([${tokens.newline}${values}${tokens.newline}${tokens.pad}])`);
+			return expandWhiteSpace(`new ${name}([${tokens.newline}${items}${tokens.newline}${tokens.pad}])`);
 		}
 
 		if (Array.isArray(input)) {
@@ -134,20 +137,18 @@ export default function stringifyObject(input, options, pad) {
 
 			seen.push(input);
 
-			const returnValue = '[' + tokens.newline + input.map((element, i) => {
-				const eol = input.length - 1 === i ? tokens.newline : ',' + tokens.newlineOrSpace;
-
+			const items = input.map((element, index) => {
 				let value = stringify(element, options, pad + indent);
 				if (options.transform) {
-					value = options.transform(input, i, value);
+					value = options.transform(input, index, value);
 				}
 
-				return tokens.indent + value + eol;
-			}).join('') + tokens.pad + ']';
+				return tokens.indent + value;
+			}).join(',' + tokens.newlineOrSpace);
 
 			seen.pop();
 
-			return expandWhiteSpace(returnValue);
+			return expandWhiteSpace(`[${tokens.newline}${items}${tokens.newline}${tokens.pad}]`);
 		}
 
 		if (isObject(input)) {
@@ -164,18 +165,16 @@ export default function stringifyObject(input, options, pad) {
 
 			seen.push(input);
 
-			const returnValue = '{' + tokens.newline + objectKeys.map((element, index) => {
-				const eol = objectKeys.length - 1 === index ? tokens.newline : ',' + tokens.newlineOrSpace;
+			const pairs = objectKeys.map(element => {
 				const isSymbol = typeof element === 'symbol';
-				const isClassic = !isSymbol && /^[a-z$_][$\w]*$/i.test(element);
 
-				let key = element;
-				if (!isClassic) {
-					key = stringify(element, options);
-				}
-
+				let key;
 				if (isSymbol) {
-					key = `[${key}]`;
+					key = `[${stringify(element, options)}]`;
+				} else if (isIdentifier(element)) {
+					key = element;
+				} else {
+					key = stringify(element, options);
 				}
 
 				let value = stringify(input[element], options, pad + indent);
@@ -183,26 +182,25 @@ export default function stringifyObject(input, options, pad) {
 					value = options.transform(input, element, value);
 				}
 
-				return tokens.indent + String(key) + ': ' + value + eol;
-			}).join('') + tokens.pad + '}';
+				return tokens.indent + key + ': ' + value;
+			}).join(',' + tokens.newlineOrSpace);
 
 			seen.pop();
 
-			return expandWhiteSpace(returnValue);
+			return expandWhiteSpace(`{${tokens.newline}${pairs}${tokens.newline}${tokens.pad}}`);
 		}
 
-		input = input.replace(/\\/g, '\\\\');
-		// eslint-disable-next-line no-control-regex
-		input = String(input).replace(/[\u0000-\u001F\u007F]/g, x =>
-			CHARACTER_ESCAPES[x] ?? `\\u${x.codePointAt(0).toString(16).padStart(4, '0')}`,
-		);
+		// String escaping
+		const stringified = String(input)
+			.replaceAll('\\', '\\\\')
+			// eslint-disable-next-line no-control-regex
+			.replaceAll(/[\u0000-\u001F\u007F]/g, x =>
+				CHARACTER_ESCAPES[x] ?? `\\u${x.codePointAt(0).toString(16).padStart(4, '0')}`);
 
 		if (options.singleQuotes === false) {
-			input = input.replace(/"/g, '\\"');
-			return `"${input}"`;
+			return `"${stringified.replaceAll('"', String.raw`\"`)}"`;
 		}
 
-		input = input.replace(/'/g, '\\\'');
-		return `'${input}'`;
+		return `'${stringified.replaceAll('\'', String.raw`\'`)}'`;
 	})(input, options, pad);
 }

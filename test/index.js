@@ -7,32 +7,32 @@ import stringifyObject from '../index.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 test('stringify an object', t => {
-	/* eslint-disable quotes, object-shorthand */
+	/* eslint-disable object-shorthand */
 	const object = {
 		foo: 'bar \'bar\'',
 		foo2: [
 			'foo',
 			'bar',
 			{
-				foo: "bar 'bar'",
+				foo: 'bar \'bar\'',
 			},
 		],
 		'foo-foo': 'bar',
 		'2foo': 'bar',
-		'@#': "bar",
+		'@#': 'bar',
 		$el: 'bar',
 		_private: 'bar',
 		number: 1,
 		boolean: true,
-		date: new Date("2014-01-29T22:41:05.665Z"),
-		escapedString: "\"\"",
+		date: new Date('2014-01-29T22:41:05.665Z'),
+		escapedString: '""',
 		null: null,
 		undefined: undefined,
 		fn: function fn() {}, // eslint-disable-line func-names
 		regexp: /./,
 		NaN: Number.NaN,
 		Infinity: Number.POSITIVE_INFINITY,
-		newlines: "foo\nbar\r\nbaz",
+		newlines: 'foo\nbar\r\nbaz',
 		[Symbol()]: Symbol(), // eslint-disable-line symbol-description
 		[Symbol('foo')]: Symbol('foo'),
 		[Symbol.for('foo')]: Symbol.for('foo'),
@@ -48,24 +48,24 @@ test('stringify an object', t => {
 
 	t.is(actual + '\n', fs.readFileSync(path.resolve(__dirname, 'fixtures/object.js'), 'utf8'));
 	t.is(
-		stringifyObject({foo: 'a \' b \' c \\\' d'}, {singleQuotes: true}),
+		stringifyObject({foo: String.raw`a ' b ' c \' d`}, {singleQuotes: true}),
 		'{\n\tfoo: \'a \\\' b \\\' c \\\\\\\' d\'\n}',
 	);
 });
 
 test('string escaping works properly', t => {
-	t.is(stringifyObject('\\', {singleQuotes: true}), '\'\\\\\''); // \
-	t.is(stringifyObject('\\\'', {singleQuotes: true}), '\'\\\\\\\'\''); // \'
-	t.is(stringifyObject('\\"', {singleQuotes: true}), '\'\\\\"\''); // \"
-	t.is(stringifyObject('\\', {singleQuotes: false}), '"\\\\"'); // \
-	t.is(stringifyObject('\\\'', {singleQuotes: false}), '"\\\\\'"'); // \'
-	t.is(stringifyObject('\\"', {singleQuotes: false}), '"\\\\\\""'); // \"
+	t.is(stringifyObject('\\', {singleQuotes: true}), String.raw`'\\'`); // \
+	t.is(stringifyObject(String.raw`\'`, {singleQuotes: true}), String.raw`'\\\''`); // \'
+	t.is(stringifyObject(String.raw`\"`, {singleQuotes: true}), String.raw`'\\"'`); // \"
+	t.is(stringifyObject('\\', {singleQuotes: false}), String.raw`"\\"`); // \
+	t.is(stringifyObject(String.raw`\'`, {singleQuotes: false}), String.raw`"\\'"`); // \'
+	t.is(stringifyObject(String.raw`\"`, {singleQuotes: false}), String.raw`"\\\""`); // \"
 	/* eslint-disable no-eval */
-	t.is(eval(stringifyObject('\\\'')), '\\\'');
-	t.is(eval(stringifyObject('\\\'', {singleQuotes: false})), '\\\'');
+	t.is(eval(stringifyObject(String.raw`\'`)), String.raw`\'`);
+	t.is(eval(stringifyObject(String.raw`\'`, {singleQuotes: false})), String.raw`\'`);
 	/* eslint-enable */
 	// Regression test for #40
-	t.is(stringifyObject("a'a"), '\'a\\\'a\''); // eslint-disable-line quotes
+	t.is(stringifyObject('a\'a'), String.raw`'a\'a'`);
 });
 
 test('detect reused object values as circular reference', t => {
@@ -232,8 +232,8 @@ test('handle symbols', t => {
 
 	// Symbol escaping with special characters
 	const symbolWithSpecialChars = Symbol('a"b\\c\n');
-	t.is(stringifyObject(symbolWithSpecialChars), 'Symbol(\'a"b\\\\c\\n\')');
-	t.is(stringifyObject(symbolWithSpecialChars, {singleQuotes: false}), 'Symbol("a\\"b\\\\c\\n")');
+	t.is(stringifyObject(symbolWithSpecialChars), String.raw`Symbol('a"b\\c\n')`);
+	t.is(stringifyObject(symbolWithSpecialChars, {singleQuotes: false}), String.raw`Symbol("a\"b\\c\n")`);
 
 	const specialCharKey = {
 		[Symbol('a"b\\c\n')]: 'value',
@@ -253,27 +253,27 @@ test('handle symbols', t => {
 
 test('should properly escape special characters', t => {
 	const s = 'tab: \t newline: \n backslash: \\';
-	t.is(stringifyObject(s), '\'tab: \\t newline: \\n backslash: \\\\\'');
+	t.is(stringifyObject(s), String.raw`'tab: \t newline: \n backslash: \\'`);
 
 	const s2 = 'carriage return: \r tab: \t';
-	t.is(stringifyObject(s2), '\'carriage return: \\r tab: \\t\'');
+	t.is(stringifyObject(s2), String.raw`'carriage return: \r tab: \t'`);
 
 	// Test other escape sequences
-	t.is(stringifyObject('\f'), '\'\\f\''); // Form feed
-	t.is(stringifyObject('\v'), '\'\\v\''); // Vertical tab
-	t.is(stringifyObject('\b'), '\'\\b\''); // Backspace
-	t.is(stringifyObject('\0'), '\'\\0\''); // Null character
+	t.is(stringifyObject('\f'), String.raw`'\f'`); // Form feed
+	t.is(stringifyObject('\v'), String.raw`'\v'`); // Vertical tab
+	t.is(stringifyObject('\b'), String.raw`'\b'`); // Backspace
+	t.is(stringifyObject('\0'), String.raw`'\0'`); // Null character
 
 	// Test control characters that need unicode escape
-	t.is(stringifyObject(String.fromCodePoint(1)), '\'\\u0001\''); // Start of heading
-	t.is(stringifyObject(String.fromCodePoint(7)), '\'\\u0007\''); // Bell
-	t.is(stringifyObject(String.fromCodePoint(27)), '\'\\u001b\''); // Escape
-	t.is(stringifyObject(String.fromCodePoint(31)), '\'\\u001f\''); // Unit separator
-	t.is(stringifyObject(String.fromCodePoint(127)), '\'\\u007f\''); // Delete
+	t.is(stringifyObject(String.fromCodePoint(1)), String.raw`'\u0001'`); // Start of heading
+	t.is(stringifyObject(String.fromCodePoint(7)), String.raw`'\u0007'`); // Bell
+	t.is(stringifyObject(String.fromCodePoint(27)), String.raw`'\u001b'`); // Escape
+	t.is(stringifyObject(String.fromCodePoint(31)), String.raw`'\u001f'`); // Unit separator
+	t.is(stringifyObject(String.fromCodePoint(127)), String.raw`'\u007f'`); // Delete
 
 	// Test a string with multiple special characters
 	const mixed = 'a\tb\nc\rd\fe\vf\bg\0h' + String.fromCodePoint(1) + 'i';
-	t.is(stringifyObject(mixed), '\'a\\tb\\nc\\rd\\fe\\vf\\bg\\0h\\u0001i\'');
+	t.is(stringifyObject(mixed), String.raw`'a\tb\nc\rd\fe\vf\bg\0h\u0001i'`);
 });
 
 test('handle Map objects', t => {
@@ -381,4 +381,26 @@ test('handle Map and Set with circular references', t => {
 	const circularSet = new Set();
 	circularSet.add(circularSet);
 	t.regex(stringifyObject(circularSet), /\[Circular]/);
+});
+
+test('handle edge cases', t => {
+	// BigInt
+	t.is(stringifyObject(BigInt(123)), '123n');
+
+	// Invalid Date
+	const invalidDate = new Date('invalid');
+	t.is(stringifyObject(invalidDate), 'new Date(\'Invalid Date\')');
+
+	// Object with numeric keys
+	const numericKeys = {};
+	numericKeys[123] = 'numeric';
+	numericKeys[456] = 'string numeric';
+	t.is(stringifyObject(numericKeys), '{\n\t\'123\': \'numeric\',\n\t\'456\': \'string numeric\'\n}');
+
+	// Reserved keywords as keys - quoted for safety
+	const reserved = {};
+	reserved.class = 'reserved';
+	reserved.const = 'keyword';
+	reserved.return = 'statement';
+	t.is(stringifyObject(reserved), '{\n\t\'class\': \'reserved\',\n\t\'const\': \'keyword\',\n\t\'return\': \'statement\'\n}');
 });

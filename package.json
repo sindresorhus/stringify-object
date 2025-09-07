@@ -14,7 +14,7 @@
 	"exports": "./index.js",
 	"sideEffects": false,
 	"engines": {
-		"node": ">=14.16"
+		"node": ">=20"
 	},
 	"scripts": {
 		"test": "xo && ava"
@@ -34,12 +34,13 @@
 	],
 	"dependencies": {
 		"get-own-enumerable-keys": "^1.0.0",
+		"is-identifier": "^1.0.1",
 		"is-obj": "^3.0.0",
 		"is-regexp": "^3.1.0"
 	},
 	"devDependencies": {
-		"ava": "^5.1.1",
-		"xo": "^0.53.1"
+		"ava": "^6.4.1",
+		"xo": "^1.2.2"
 	},
 	"xo": {
 		"ignores": [

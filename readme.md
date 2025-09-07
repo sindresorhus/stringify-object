@@ -44,6 +44,13 @@ console.log(pretty);
   }
 }
 */
+
+// Also works with Map and Set
+const map = new Map([['key', 'value']]);
+console.log(stringifyObject(map));
+//=> new Map([
+//=>   ['key', 'value']
+//=> ])
 ```
 
 ## API
@@ -56,7 +63,7 @@ Object keys are only quoted when necessary, for example, `{'foo-bar': true}`.
 
 #### input
 
-Type: `object | Array`
+Type: `object | Array | Map | Set`
 
 #### options
 
@@ -74,7 +81,7 @@ Preferred indentation.
 Type: `boolean`\
 Default: `true`
 
-Set to false to get double-quoted strings.
+Set to `false` to get double-quoted strings.
 
 ##### filter(object, property)
 
