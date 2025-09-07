@@ -275,3 +275,110 @@ test('should properly escape special characters', t => {
 	const mixed = 'a\tb\nc\rd\fe\vf\bg\0h' + String.fromCodePoint(1) + 'i';
 	t.is(stringifyObject(mixed), '\'a\\tb\\nc\\rd\\fe\\vf\\bg\\0h\\u0001i\'');
 });
+
+test('handle Map objects', t => {
+	// Empty Map
+	const emptyMap = new Map();
+	t.is(stringifyObject(emptyMap), 'new Map()');
+
+	// Map with various types
+	const map = new Map([
+		['string', 'value'],
+		[42, 'number key'],
+		[true, 'boolean key'],
+		[null, 'null key'],
+		[undefined, 'undefined key'],
+	]);
+	t.is(stringifyObject(map), `new Map([
+	['string', 'value'],
+	[42, 'number key'],
+	[true, 'boolean key'],
+	[null, 'null key'],
+	[undefined, 'undefined key']
+])`);
+
+	// Map with object values
+	const objectMap = new Map([
+		['a', {foo: 'bar'}],
+		['b', [1, 2, 3]],
+	]);
+	t.is(stringifyObject(objectMap), `new Map([
+	['a', {
+		foo: 'bar'
+	}],
+	['b', [
+		1,
+		2,
+		3
+	]]
+])`);
+
+	// Map with symbol keys
+	const symbolMap = new Map([
+		[Symbol('test'), 'symbol key'],
+		[Symbol.iterator, 'well-known symbol'],
+	]);
+	t.is(stringifyObject(symbolMap), `new Map([
+	[Symbol('test'), 'symbol key'],
+	[Symbol.iterator, 'well-known symbol']
+])`);
+
+	// Nested Map
+	const nestedMap = new Map([
+		['inner', new Map([['deep', 'value']])],
+	]);
+	t.is(stringifyObject(nestedMap), `new Map([
+	['inner', new Map([
+		['deep', 'value']
+	])]
+])`);
+});
+
+test('handle Set objects', t => {
+	// Empty Set
+	const emptySet = new Set();
+	t.is(stringifyObject(emptySet), 'new Set()');
+
+	// Set with various types
+	const set = new Set(['string', 42, true, null, undefined]);
+	t.is(stringifyObject(set), `new Set([
+	'string',
+	42,
+	true,
+	null,
+	undefined
+])`);
+
+	// Set with objects
+	const objectSet = new Set([{foo: 'bar'}, [1, 2, 3]]);
+	t.is(stringifyObject(objectSet), `new Set([
+	{
+		foo: 'bar'
+	},
+	[
+		1,
+		2,
+		3
+	]
+])`);
+
+	// Nested Set
+	const nestedSet = new Set([new Set(['inner'])]);
+	t.is(stringifyObject(nestedSet), `new Set([
+	new Set([
+		'inner'
+	])
+])`);
+});
+
+test('handle Map and Set with circular references', t => {
+	// Circular Map
+	const circularMap = new Map();
+	circularMap.set('self', circularMap);
+	t.regex(stringifyObject(circularMap), /\[Circular]/);
+
+	// Circular Set
+	const circularSet = new Set();
+	circularSet.add(circularSet);
+	t.regex(stringifyObject(circularSet), /\[Circular]/);
+});

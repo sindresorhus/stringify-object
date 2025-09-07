@@ -2,6 +2,16 @@ import isRegexp from 'is-regexp';
 import isObject from 'is-obj';
 import getOwnEnumerableKeys from 'get-own-enumerable-keys';
 
+const CHARACTER_ESCAPES = {
+	'\n': '\\n',
+	'\r': '\\r',
+	'\t': '\\t',
+	'\b': '\\b',
+	'\f': '\\f',
+	'\v': '\\v',
+	'\0': '\\0',
+};
+
 export default function stringifyObject(input, options, pad) {
 	const seen = [];
 
@@ -85,6 +95,38 @@ export default function stringifyObject(input, options, pad) {
 			return `new Date('${input.toISOString()}')`;
 		}
 
+		if (input instanceof Map) {
+			if (input.size === 0) {
+				return 'new Map()';
+			}
+
+			seen.push(input);
+
+			const entries = [...input].map(([key, value]) =>
+				tokens.indent + `[${stringify(key, options, pad + indent)}, ${stringify(value, options, pad + indent)}]`,
+			).join(',' + tokens.newlineOrSpace);
+
+			seen.pop();
+
+			return expandWhiteSpace(`new Map([${tokens.newline}${entries}${tokens.newline}${tokens.pad}])`);
+		}
+
+		if (input instanceof Set) {
+			if (input.size === 0) {
+				return 'new Set()';
+			}
+
+			seen.push(input);
+
+			const values = [...input].map(value =>
+				tokens.indent + stringify(value, options, pad + indent),
+			).join(',' + tokens.newlineOrSpace);
+
+			seen.pop();
+
+			return expandWhiteSpace(`new Set([${tokens.newline}${values}${tokens.newline}${tokens.pad}])`);
+		}
+
 		if (Array.isArray(input)) {
 			if (input.length === 0) {
 				return '[]';
@@ -151,19 +193,9 @@ export default function stringifyObject(input, options, pad) {
 
 		input = input.replace(/\\/g, '\\\\');
 		// eslint-disable-next-line no-control-regex
-		input = String(input).replace(/[\u0000-\u001F\u007F]/g, x => {
-			const escapes = {
-				'\n': '\\n',
-				'\r': '\\r',
-				'\t': '\\t',
-				'\b': '\\b',
-				'\f': '\\f',
-				'\v': '\\v',
-				'\0': '\\0',
-			};
-
-			return escapes[x] ?? ('\\u' + x.codePointAt(0).toString(16).padStart(4, '0'));
-		});
+		input = String(input).replace(/[\u0000-\u001F\u007F]/g, x =>
+			CHARACTER_ESCAPES[x] ?? `\\u${x.codePointAt(0).toString(16).padStart(4, '0')}`,
+		);
 
 		if (options.singleQuotes === false) {
 			input = input.replace(/"/g, '\\"');
