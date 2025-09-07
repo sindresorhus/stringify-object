@@ -150,7 +150,20 @@ export default function stringifyObject(input, options, pad) {
 		}
 
 		input = input.replace(/\\/g, '\\\\');
-		input = String(input).replace(/[\r\n]/g, x => x === '\n' ? '\\n' : '\\r');
+		// eslint-disable-next-line no-control-regex
+		input = String(input).replace(/[\u0000-\u001F\u007F]/g, x => {
+			const escapes = {
+				'\n': '\\n',
+				'\r': '\\r',
+				'\t': '\\t',
+				'\b': '\\b',
+				'\f': '\\f',
+				'\v': '\\v',
+				'\0': '\\0',
+			};
+
+			return escapes[x] ?? ('\\u' + x.codePointAt(0).toString(16).padStart(4, '0'));
+		});
 
 		if (options.singleQuotes === false) {
 			input = input.replace(/"/g, '\\"');

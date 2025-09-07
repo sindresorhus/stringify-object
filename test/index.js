@@ -250,4 +250,28 @@ test('handle symbols', t => {
 	t.is(stringifyObject(Symbol('Symbol.hasInstance')), 'Symbol(\'Symbol.hasInstance\')');
 	t.is(stringifyObject(Symbol('Symbol.toStringTag')), 'Symbol(\'Symbol.toStringTag\')');
 });
+
+test('should properly escape special characters', t => {
+	const s = 'tab: \t newline: \n backslash: \\';
+	t.is(stringifyObject(s), '\'tab: \\t newline: \\n backslash: \\\\\'');
+
+	const s2 = 'carriage return: \r tab: \t';
+	t.is(stringifyObject(s2), '\'carriage return: \\r tab: \\t\'');
+
+	// Test other escape sequences
+	t.is(stringifyObject('\f'), '\'\\f\''); // Form feed
+	t.is(stringifyObject('\v'), '\'\\v\''); // Vertical tab
+	t.is(stringifyObject('\b'), '\'\\b\''); // Backspace
+	t.is(stringifyObject('\0'), '\'\\0\''); // Null character
+
+	// Test control characters that need unicode escape
+	t.is(stringifyObject(String.fromCodePoint(1)), '\'\\u0001\''); // Start of heading
+	t.is(stringifyObject(String.fromCodePoint(7)), '\'\\u0007\''); // Bell
+	t.is(stringifyObject(String.fromCodePoint(27)), '\'\\u001b\''); // Escape
+	t.is(stringifyObject(String.fromCodePoint(31)), '\'\\u001f\''); // Unit separator
+	t.is(stringifyObject(String.fromCodePoint(127)), '\'\\u007f\''); // Delete
+
+	// Test a string with multiple special characters
+	const mixed = 'a\tb\nc\rd\fe\vf\bg\0h' + String.fromCodePoint(1) + 'i';
+	t.is(stringifyObject(mixed), '\'a\\tb\\nc\\rd\\fe\\vf\\bg\\0h\\u0001i\'');
 });
