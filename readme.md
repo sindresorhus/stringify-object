@@ -61,6 +61,8 @@ Circular references will be replaced with `"[Circular]"`.
 
 Object keys are only quoted when necessary, for example, `{'foo-bar': true}`.
 
+An own `__proto__` key is never included in the output, as emitting it would set the prototype instead of creating a property when the output is evaluated.
+
 #### input
 
 Type: `object | Array | Map | Set`
@@ -95,6 +97,8 @@ Type: `Function`\
 Default: `undefined`
 
 Expected to return a `string` that transforms the string that resulted from stringifying `object[property]`. This can be used to detect special types of objects that need to be stringified in a particular way. The `transform` function might return an alternate string in this case, otherwise returning the `originalResult`.
+
+When stringifying a `Map` or `Set`, `object` is the `Map`/`Set`, `property` is the entry's key (`Map`) or value (`Set`), and `originalResult` is the stringified value.
 
 Here's an example that uses the `transform` option to mask fields named "password":
 

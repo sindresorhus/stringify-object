@@ -1,13 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import test from 'ava';
+import test from 'node:test';
+import assert from 'node:assert/strict';
 import stringifyObject from '../index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-test('stringify an object', t => {
-	/* eslint-disable object-shorthand */
+test('stringify an object', () => {
+	/* eslint-disable object-shorthand -- Testing shorthand-incompatible keys alongside plain ones */
 	const object = {
 		foo: 'bar \'bar\'',
 		foo2: [
@@ -29,9 +30,9 @@ test('stringify an object', t => {
 		null: null,
 		undefined: undefined,
 		fn: function fn() {}, // eslint-disable-line func-names
-		regexp: /./,
-		NaN: Number.NaN,
-		Infinity: Number.POSITIVE_INFINITY,
+		regexp: /./, // eslint-disable-line require-unicode-regexp -- Fixture data, must stringify as `/./`
+		NaN: NaN,
+		Infinity: Infinity,
 		newlines: 'foo\nbar\r\nbaz',
 		[Symbol()]: Symbol(), // eslint-disable-line symbol-description
 		[Symbol('foo')]: Symbol('foo'),
@@ -46,60 +47,60 @@ test('stringify an object', t => {
 		singleQuotes: false,
 	});
 
-	t.is(actual + '\n', fs.readFileSync(path.resolve(__dirname, 'fixtures/object.js'), 'utf8'));
-	t.is(
+	assert.equal(actual + '\n', fs.readFileSync(path.resolve(__dirname, 'fixtures/object.js'), 'utf8'));
+	assert.equal(
 		stringifyObject({foo: String.raw`a ' b ' c \' d`}, {singleQuotes: true}),
 		'{\n\tfoo: \'a \\\' b \\\' c \\\\\\\' d\'\n}',
 	);
 });
 
-test('string escaping works properly', t => {
-	t.is(stringifyObject('\\', {singleQuotes: true}), String.raw`'\\'`); // \
-	t.is(stringifyObject(String.raw`\'`, {singleQuotes: true}), String.raw`'\\\''`); // \'
-	t.is(stringifyObject(String.raw`\"`, {singleQuotes: true}), String.raw`'\\"'`); // \"
-	t.is(stringifyObject('\\', {singleQuotes: false}), String.raw`"\\"`); // \
-	t.is(stringifyObject(String.raw`\'`, {singleQuotes: false}), String.raw`"\\'"`); // \'
-	t.is(stringifyObject(String.raw`\"`, {singleQuotes: false}), String.raw`"\\\""`); // \"
-	/* eslint-disable no-eval */
-	t.is(eval(stringifyObject(String.raw`\'`)), String.raw`\'`);
-	t.is(eval(stringifyObject(String.raw`\'`, {singleQuotes: false})), String.raw`\'`);
+test('string escaping works properly', () => {
+	assert.equal(stringifyObject('\\', {singleQuotes: true}), String.raw`'\\'`); // \
+	assert.equal(stringifyObject(String.raw`\'`, {singleQuotes: true}), String.raw`'\\\''`); // \'
+	assert.equal(stringifyObject(String.raw`\"`, {singleQuotes: true}), String.raw`'\\"'`); // \"
+	assert.equal(stringifyObject('\\', {singleQuotes: false}), String.raw`"\\"`); // \
+	assert.equal(stringifyObject(String.raw`\'`, {singleQuotes: false}), String.raw`"\\'"`); // \'
+	assert.equal(stringifyObject(String.raw`\"`, {singleQuotes: false}), String.raw`"\\\""`); // \"
+	/* eslint-disable no-eval -- Verifying the stringified output is valid, evaluable JS */
+	assert.equal(eval(stringifyObject(String.raw`\'`)), String.raw`\'`);
+	assert.equal(eval(stringifyObject(String.raw`\'`, {singleQuotes: false})), String.raw`\'`);
 	/* eslint-enable */
 	// Regression test for #40
-	t.is(stringifyObject('a\'a'), String.raw`'a\'a'`);
+	assert.equal(stringifyObject('a\'a'), String.raw`'a\'a'`);
 });
 
-test('detect reused object values as circular reference', t => {
+test('detect reused object values as circular reference', () => {
 	const value = {val: 10};
 	const object = {foo: value, bar: value};
-	t.is(stringifyObject(object), '{\n\tfoo: {\n\t\tval: 10\n\t},\n\tbar: {\n\t\tval: 10\n\t}\n}');
+	assert.equal(stringifyObject(object), '{\n\tfoo: {\n\t\tval: 10\n\t},\n\tbar: {\n\t\tval: 10\n\t}\n}');
 });
 
-test('detect reused array values as false circular references', t => {
+test('detect reused array values as false circular references', () => {
 	const value = [10];
 	const object = {foo: value, bar: value};
-	t.is(stringifyObject(object), '{\n\tfoo: [\n\t\t10\n\t],\n\tbar: [\n\t\t10\n\t]\n}');
+	assert.equal(stringifyObject(object), '{\n\tfoo: [\n\t\t10\n\t],\n\tbar: [\n\t\t10\n\t]\n}');
 });
 
-test('considering filter option to stringify an object', t => {
+test('considering filter option to stringify an object', () => {
 	const value = {val: 10};
 	const object = {foo: value, bar: value};
 	const actual = stringifyObject(object, {
-		filter: (object, prop) => prop !== 'foo',
+		filter: (currentObject, prop) => prop !== 'foo',
 	});
-	t.is(actual, '{\n\tbar: {\n\t\tval: 10\n\t}\n}');
+	assert.equal(actual, '{\n\tbar: {\n\t\tval: 10\n\t}\n}');
 
 	const actual2 = stringifyObject(object, {
-		filter: (object, prop) => prop !== 'bar',
+		filter: (currentObject, prop) => prop !== 'bar',
 	});
-	t.is(actual2, '{\n\tfoo: {\n\t\tval: 10\n\t}\n}');
+	assert.equal(actual2, '{\n\tfoo: {\n\t\tval: 10\n\t}\n}');
 
 	const actual3 = stringifyObject(object, {
-		filter: (object, prop) => prop !== 'val' && prop !== 'bar',
+		filter: (currentObject, prop) => prop !== 'val' && prop !== 'bar',
 	});
-	t.is(actual3, '{\n\tfoo: {}\n}');
+	assert.equal(actual3, '{\n\tfoo: {}\n}');
 });
 
-test('allows an object to be transformed', t => {
+test('allows an object to be transformed', () => {
 	const object = {
 		foo: {
 			val: 10,
@@ -109,16 +110,16 @@ test('allows an object to be transformed', t => {
 	};
 
 	const actual = stringifyObject(object, {
-		transform(object, prop, result) {
+		transform(currentObject, prop, result) {
 			if (prop === 'val') {
-				return String(object[prop] + 1);
+				return String(currentObject[prop] + 1);
 			}
 
 			if (prop === 'bar') {
 				return '\'' + result + 'L\'';
 			}
 
-			if (object[prop] === 8) {
+			if (currentObject[prop] === 8) {
 				return 'LOL';
 			}
 
@@ -126,99 +127,99 @@ test('allows an object to be transformed', t => {
 		},
 	});
 
-	t.is(actual, '{\n\tfoo: {\n\t\tval: 11\n\t},\n\tbar: \'9L\',\n\tbaz: [\n\t\tLOL\n\t]\n}');
+	assert.equal(actual, '{\n\tfoo: {\n\t\tval: 11\n\t},\n\tbar: \'9L\',\n\tbaz: [\n\t\tLOL\n\t]\n}');
 });
 
-test('doesn\'t  crash with circular references in arrays', t => {
+test('doesn\'t crash with circular references in arrays', () => {
 	const array = [];
 	array.push(array);
-	t.notThrows(() => {
+	assert.doesNotThrow(() => {
 		stringifyObject(array);
 	});
 
 	const nestedArray = [[]];
 	nestedArray[0][0] = nestedArray;
-	t.notThrows(() => {
+	assert.doesNotThrow(() => {
 		stringifyObject(nestedArray);
 	});
 });
 
-test('handle circular references in arrays', t => {
+test('handle circular references in arrays', () => {
 	const array2 = [];
 	const array = [array2];
 	array2[0] = array2;
 
-	t.notThrows(() => {
+	assert.doesNotThrow(() => {
 		stringifyObject(array);
 	});
 });
 
-test('stringify complex circular arrays', t => {
+test('stringify complex circular arrays', () => {
 	const array = [[[]]];
 	array[0].push(array);
 	array[0][0].push(array, 10);
 	array[0][0][0] = array;
-	t.is(stringifyObject(array), '[\n\t[\n\t\t[\n\t\t\t"[Circular]",\n\t\t\t10\n\t\t],\n\t\t"[Circular]"\n\t]\n]');
+	assert.equal(stringifyObject(array), '[\n\t[\n\t\t[\n\t\t\t"[Circular]",\n\t\t\t10\n\t\t],\n\t\t"[Circular]"\n\t]\n]');
 });
 
-test('allows short objects to be one-lined', t => {
+test('allows short objects to be one-lined', () => {
 	const object = {id: 8, name: 'Jane'};
 
-	t.is(stringifyObject(object), '{\n\tid: 8,\n\tname: \'Jane\'\n}');
-	t.is(stringifyObject(object, {inlineCharacterLimit: 21}), '{id: 8, name: \'Jane\'}');
-	t.is(stringifyObject(object, {inlineCharacterLimit: 20}), '{\n\tid: 8,\n\tname: \'Jane\'\n}');
+	assert.equal(stringifyObject(object), '{\n\tid: 8,\n\tname: \'Jane\'\n}');
+	assert.equal(stringifyObject(object, {inlineCharacterLimit: 21}), '{id: 8, name: \'Jane\'}');
+	assert.equal(stringifyObject(object, {inlineCharacterLimit: 20}), '{\n\tid: 8,\n\tname: \'Jane\'\n}');
 });
 
-test('allows short arrays to be one-lined', t => {
+test('allows short arrays to be one-lined', () => {
 	const array = ['foo', {id: 8, name: 'Jane'}, 42];
 
-	t.is(stringifyObject(array), '[\n\t\'foo\',\n\t{\n\t\tid: 8,\n\t\tname: \'Jane\'\n\t},\n\t42\n]');
-	t.is(stringifyObject(array, {inlineCharacterLimit: 34}), '[\'foo\', {id: 8, name: \'Jane\'}, 42]');
-	t.is(stringifyObject(array, {inlineCharacterLimit: 33}), '[\n\t\'foo\',\n\t{id: 8, name: \'Jane\'},\n\t42\n]');
+	assert.equal(stringifyObject(array), '[\n\t\'foo\',\n\t{\n\t\tid: 8,\n\t\tname: \'Jane\'\n\t},\n\t42\n]');
+	assert.equal(stringifyObject(array, {inlineCharacterLimit: 34}), '[\'foo\', {id: 8, name: \'Jane\'}, 42]');
+	assert.equal(stringifyObject(array, {inlineCharacterLimit: 33}), '[\n\t\'foo\',\n\t{id: 8, name: \'Jane\'},\n\t42\n]');
 });
 
-test('does not mess up indents for complex objects', t => {
+test('does not mess up indents for complex objects', () => {
 	const object = {
 		arr: [1, 2, 3],
 		nested: {hello: 'world'},
 	};
 
-	t.is(stringifyObject(object), '{\n\tarr: [\n\t\t1,\n\t\t2,\n\t\t3\n\t],\n\tnested: {\n\t\thello: \'world\'\n\t}\n}');
-	t.is(stringifyObject(object, {inlineCharacterLimit: 12}), '{\n\tarr: [1, 2, 3],\n\tnested: {\n\t\thello: \'world\'\n\t}\n}');
+	assert.equal(stringifyObject(object), '{\n\tarr: [\n\t\t1,\n\t\t2,\n\t\t3\n\t],\n\tnested: {\n\t\thello: \'world\'\n\t}\n}');
+	assert.equal(stringifyObject(object, {inlineCharacterLimit: 12}), '{\n\tarr: [1, 2, 3],\n\tnested: {\n\t\thello: \'world\'\n\t}\n}');
 });
 
-test('handles non-plain object', t => {
-	// TODO: It should work without `fileURLToPath` but currently it throws for an unknown reason.
-	t.not(stringifyObject(fs.statSync(fileURLToPath(import.meta.url))), '[object Object]');
+test('handles non-plain object', () => {
+	const stats = fs.statSync(new URL(import.meta.url));
+	assert.notEqual(stringifyObject(stats), '[object Object]');
 });
 
-test('don\'t stringify non-enumerable symbols', t => {
+test('don\'t stringify non-enumerable symbols', () => {
 	const object = {
 		[Symbol('for enumerable key')]: undefined,
 	};
 	const symbol = Symbol('for non-enumerable key');
 	Object.defineProperty(object, symbol, {enumerable: false});
 
-	t.is(stringifyObject(object), '{\n\t[Symbol(\'for enumerable key\')]: undefined\n}');
+	assert.equal(stringifyObject(object), '{\n\t[Symbol(\'for enumerable key\')]: undefined\n}');
 });
 
-test('handle symbols', t => {
+test('handle symbols', () => {
 	const object = {
 		[Symbol('unique')]: Symbol('unique'),
 		[Symbol.for('registry')]: [Symbol.for('registry'), 2],
 		[Symbol.iterator]: {k: Symbol.iterator},
 		[Symbol()]: 'undef', // eslint-disable-line symbol-description
 	};
-	t.is(stringifyObject(object), '{\n\t[Symbol(\'unique\')]: Symbol(\'unique\'),\n\t[Symbol.for(\'registry\')]: [\n\t\tSymbol.for(\'registry\'),\n\t\t2\n\t],\n\t[Symbol.iterator]: {\n\t\tk: Symbol.iterator\n\t},\n\t[Symbol()]: \'undef\'\n}');
+	assert.equal(stringifyObject(object), '{\n\t[Symbol(\'unique\')]: Symbol(\'unique\'),\n\t[Symbol.for(\'registry\')]: [\n\t\tSymbol.for(\'registry\'),\n\t\t2\n\t],\n\t[Symbol.iterator]: {\n\t\tk: Symbol.iterator\n\t},\n\t[Symbol()]: \'undef\'\n}');
 
 	// Anonymous symbol (no description)
-	t.is(stringifyObject(Symbol()), 'Symbol()'); // eslint-disable-line symbol-description
+	assert.equal(stringifyObject(Symbol()), 'Symbol()'); // eslint-disable-line symbol-description
 
 	// Symbol with empty string description
-	t.is(stringifyObject(Symbol('')), 'Symbol(\'\')');
+	assert.equal(stringifyObject(Symbol('')), 'Symbol(\'\')');
 
 	// Symbol.for with empty string
-	t.is(stringifyObject(Symbol.for('')), 'Symbol.for(\'\')');
+	assert.equal(stringifyObject(Symbol.for('')), 'Symbol.for(\'\')');
 
 	// Test as object keys
 	const emptySymbolKeys = {
@@ -226,60 +227,60 @@ test('handle symbols', t => {
 		[Symbol('')]: 'empty string',
 		[Symbol.for('')]: 'empty for',
 	};
-	t.regex(stringifyObject(emptySymbolKeys), /\[Symbol\(\)]/);
-	t.regex(stringifyObject(emptySymbolKeys), /\[Symbol\(''\)]/);
-	t.regex(stringifyObject(emptySymbolKeys), /\[Symbol\.for\(''\)]/);
+	assert.match(stringifyObject(emptySymbolKeys), /\[Symbol\(\)\]/v);
+	assert.match(stringifyObject(emptySymbolKeys), /\[Symbol\(''\)\]/v);
+	assert.match(stringifyObject(emptySymbolKeys), /\[Symbol\.for\(''\)\]/v);
 
 	// Symbol escaping with special characters
 	const symbolWithSpecialChars = Symbol('a"b\\c\n');
-	t.is(stringifyObject(symbolWithSpecialChars), String.raw`Symbol('a"b\\c\n')`);
-	t.is(stringifyObject(symbolWithSpecialChars, {singleQuotes: false}), String.raw`Symbol("a\"b\\c\n")`);
+	assert.equal(stringifyObject(symbolWithSpecialChars), String.raw`Symbol('a"b\\c\n')`);
+	assert.equal(stringifyObject(symbolWithSpecialChars, {singleQuotes: false}), String.raw`Symbol("a\"b\\c\n")`);
 
 	const specialCharKey = {
 		[Symbol('a"b\\c\n')]: 'value',
 	};
-	t.regex(stringifyObject(specialCharKey), /\[Symbol\('a"b\\\\c\\n'\)]/);
+	assert.match(stringifyObject(specialCharKey), /\[Symbol\('a"b\\\\c\\n'\)\]/v);
 
 	// Well-known symbols
-	t.is(stringifyObject(Symbol.iterator), 'Symbol.iterator');
-	t.is(stringifyObject(Symbol.hasInstance), 'Symbol.hasInstance');
-	t.is(stringifyObject(Symbol.toStringTag), 'Symbol.toStringTag');
+	assert.equal(stringifyObject(Symbol.iterator), 'Symbol.iterator');
+	assert.equal(stringifyObject(Symbol.hasInstance), 'Symbol.hasInstance');
+	assert.equal(stringifyObject(Symbol.toStringTag), 'Symbol.toStringTag');
 
 	// Look-alike symbols (not real well-known symbols)
-	t.is(stringifyObject(Symbol('Symbol.iterator')), 'Symbol(\'Symbol.iterator\')');
-	t.is(stringifyObject(Symbol('Symbol.hasInstance')), 'Symbol(\'Symbol.hasInstance\')');
-	t.is(stringifyObject(Symbol('Symbol.toStringTag')), 'Symbol(\'Symbol.toStringTag\')');
+	assert.equal(stringifyObject(Symbol('Symbol.iterator')), 'Symbol(\'Symbol.iterator\')');
+	assert.equal(stringifyObject(Symbol('Symbol.hasInstance')), 'Symbol(\'Symbol.hasInstance\')');
+	assert.equal(stringifyObject(Symbol('Symbol.toStringTag')), 'Symbol(\'Symbol.toStringTag\')');
 });
 
-test('should properly escape special characters', t => {
+test('should properly escape special characters', () => {
 	const s = 'tab: \t newline: \n backslash: \\';
-	t.is(stringifyObject(s), String.raw`'tab: \t newline: \n backslash: \\'`);
+	assert.equal(stringifyObject(s), String.raw`'tab: \t newline: \n backslash: \\'`);
 
 	const s2 = 'carriage return: \r tab: \t';
-	t.is(stringifyObject(s2), String.raw`'carriage return: \r tab: \t'`);
+	assert.equal(stringifyObject(s2), String.raw`'carriage return: \r tab: \t'`);
 
 	// Test other escape sequences
-	t.is(stringifyObject('\f'), String.raw`'\f'`); // Form feed
-	t.is(stringifyObject('\v'), String.raw`'\v'`); // Vertical tab
-	t.is(stringifyObject('\b'), String.raw`'\b'`); // Backspace
-	t.is(stringifyObject('\0'), String.raw`'\0'`); // Null character
+	assert.equal(stringifyObject('\f'), String.raw`'\f'`); // Form feed
+	assert.equal(stringifyObject('\v'), String.raw`'\v'`); // Vertical tab
+	assert.equal(stringifyObject('\b'), String.raw`'\b'`); // Backspace
+	assert.equal(stringifyObject('\0'), String.raw`'\u{0}'`); // Null character
 
 	// Test control characters that need unicode escape
-	t.is(stringifyObject(String.fromCodePoint(1)), String.raw`'\u0001'`); // Start of heading
-	t.is(stringifyObject(String.fromCodePoint(7)), String.raw`'\u0007'`); // Bell
-	t.is(stringifyObject(String.fromCodePoint(27)), String.raw`'\u001b'`); // Escape
-	t.is(stringifyObject(String.fromCodePoint(31)), String.raw`'\u001f'`); // Unit separator
-	t.is(stringifyObject(String.fromCodePoint(127)), String.raw`'\u007f'`); // Delete
+	assert.equal(stringifyObject(String.fromCodePoint(1)), String.raw`'\u{1}'`); // Start of heading
+	assert.equal(stringifyObject(String.fromCodePoint(7)), String.raw`'\u{7}'`); // Bell
+	assert.equal(stringifyObject(String.fromCodePoint(27)), String.raw`'\u{1b}'`); // Escape
+	assert.equal(stringifyObject(String.fromCodePoint(31)), String.raw`'\u{1f}'`); // Unit separator
+	assert.equal(stringifyObject(String.fromCodePoint(127)), String.raw`'\u{7f}'`); // Delete
 
 	// Test a string with multiple special characters
 	const mixed = 'a\tb\nc\rd\fe\vf\bg\0h' + String.fromCodePoint(1) + 'i';
-	t.is(stringifyObject(mixed), String.raw`'a\tb\nc\rd\fe\vf\bg\0h\u0001i'`);
+	assert.equal(stringifyObject(mixed), String.raw`'a\tb\nc\rd\fe\vf\bg\u{0}h\u{1}i'`);
 });
 
-test('handle Map objects', t => {
+test('handle Map objects', () => {
 	// Empty Map
 	const emptyMap = new Map();
-	t.is(stringifyObject(emptyMap), 'new Map()');
+	assert.equal(stringifyObject(emptyMap), 'new Map()');
 
 	// Map with various types
 	const map = new Map([
@@ -289,7 +290,7 @@ test('handle Map objects', t => {
 		[null, 'null key'],
 		[undefined, 'undefined key'],
 	]);
-	t.is(stringifyObject(map), `new Map([
+	assert.equal(stringifyObject(map), `new Map([
 	['string', 'value'],
 	[42, 'number key'],
 	[true, 'boolean key'],
@@ -302,7 +303,7 @@ test('handle Map objects', t => {
 		['a', {foo: 'bar'}],
 		['b', [1, 2, 3]],
 	]);
-	t.is(stringifyObject(objectMap), `new Map([
+	assert.equal(stringifyObject(objectMap), `new Map([
 	['a', {
 		foo: 'bar'
 	}],
@@ -318,7 +319,7 @@ test('handle Map objects', t => {
 		[Symbol('test'), 'symbol key'],
 		[Symbol.iterator, 'well-known symbol'],
 	]);
-	t.is(stringifyObject(symbolMap), `new Map([
+	assert.equal(stringifyObject(symbolMap), `new Map([
 	[Symbol('test'), 'symbol key'],
 	[Symbol.iterator, 'well-known symbol']
 ])`);
@@ -327,21 +328,21 @@ test('handle Map objects', t => {
 	const nestedMap = new Map([
 		['inner', new Map([['deep', 'value']])],
 	]);
-	t.is(stringifyObject(nestedMap), `new Map([
+	assert.equal(stringifyObject(nestedMap), `new Map([
 	['inner', new Map([
 		['deep', 'value']
 	])]
 ])`);
 });
 
-test('handle Set objects', t => {
+test('handle Set objects', () => {
 	// Empty Set
 	const emptySet = new Set();
-	t.is(stringifyObject(emptySet), 'new Set()');
+	assert.equal(stringifyObject(emptySet), 'new Set()');
 
 	// Set with various types
 	const set = new Set(['string', 42, true, null, undefined]);
-	t.is(stringifyObject(set), `new Set([
+	assert.equal(stringifyObject(set), `new Set([
 	'string',
 	42,
 	true,
@@ -351,7 +352,7 @@ test('handle Set objects', t => {
 
 	// Set with objects
 	const objectSet = new Set([{foo: 'bar'}, [1, 2, 3]]);
-	t.is(stringifyObject(objectSet), `new Set([
+	assert.equal(stringifyObject(objectSet), `new Set([
 	{
 		foo: 'bar'
 	},
@@ -364,43 +365,69 @@ test('handle Set objects', t => {
 
 	// Nested Set
 	const nestedSet = new Set([new Set(['inner'])]);
-	t.is(stringifyObject(nestedSet), `new Set([
+	assert.equal(stringifyObject(nestedSet), `new Set([
 	new Set([
 		'inner'
 	])
 ])`);
 });
 
-test('handle Map and Set with circular references', t => {
+test('handle Map and Set with circular references', () => {
 	// Circular Map
 	const circularMap = new Map();
 	circularMap.set('self', circularMap);
-	t.regex(stringifyObject(circularMap), /\[Circular]/);
+	assert.match(stringifyObject(circularMap), /\[Circular\]/v);
 
 	// Circular Set
 	const circularSet = new Set();
 	circularSet.add(circularSet);
-	t.regex(stringifyObject(circularSet), /\[Circular]/);
+	assert.match(stringifyObject(circularSet), /\[Circular\]/v);
 });
 
-test('handle edge cases', t => {
+test('handle edge cases', () => {
 	// BigInt
-	t.is(stringifyObject(BigInt(123)), '123n');
+	assert.equal(stringifyObject(123n), '123n');
 
 	// Invalid Date
 	const invalidDate = new Date('invalid');
-	t.is(stringifyObject(invalidDate), 'new Date(\'Invalid Date\')');
+	assert.equal(stringifyObject(invalidDate), 'new Date(\'Invalid Date\')');
+
+	// Date honors the `singleQuotes` option
+	const date = new Date('2014-01-29T22:41:05.665Z');
+	assert.equal(stringifyObject(date), 'new Date(\'2014-01-29T22:41:05.665Z\')');
+	assert.equal(stringifyObject(date, {singleQuotes: false}), 'new Date("2014-01-29T22:41:05.665Z")');
+	assert.equal(stringifyObject(invalidDate, {singleQuotes: false}), 'new Date("Invalid Date")');
 
 	// Object with numeric keys
-	const numericKeys = {};
-	numericKeys[123] = 'numeric';
-	numericKeys[456] = 'string numeric';
-	t.is(stringifyObject(numericKeys), '{\n\t\'123\': \'numeric\',\n\t\'456\': \'string numeric\'\n}');
+	const numericKeys = {123: 'numeric', 456: 'string numeric'};
+	assert.equal(stringifyObject(numericKeys), '{\n\t\'123\': \'numeric\',\n\t\'456\': \'string numeric\'\n}');
 
 	// Reserved keywords as keys - quoted for safety
-	const reserved = {};
-	reserved.class = 'reserved';
-	reserved.const = 'keyword';
-	reserved.return = 'statement';
-	t.is(stringifyObject(reserved), '{\n\t\'class\': \'reserved\',\n\t\'const\': \'keyword\',\n\t\'return\': \'statement\'\n}');
+	const reserved = {class: 'reserved', const: 'keyword', return: 'statement'};
+	assert.equal(stringifyObject(reserved), '{\n\t\'class\': \'reserved\',\n\t\'const\': \'keyword\',\n\t\'return\': \'statement\'\n}');
+
+	// `__proto__` as an own enumerable key is never emitted, since it would set the
+	// prototype instead of creating a property when the output is evaluated
+	const protoKey = Object.defineProperty({other: 'kept'}, '__proto__', {value: 'value', enumerable: true});
+	assert.equal(stringifyObject(protoKey), '{\n\tother: \'kept\'\n}');
+});
+
+test('empty indent option is respected', () => {
+	assert.equal(stringifyObject({a: 1, b: 2}, {indent: ''}), '{\na: 1,\nb: 2\n}');
+});
+
+test('transform option works on Map and Set entries', () => {
+	// For Map entries, transform receives the stringified *value* only, matching
+	// how it receives the stringified value for object properties and array elements
+	const map = new Map([['a', 1], ['b', 2]]);
+	const mapActual = stringifyObject(map, {
+		transform: (object, key, result) => key === 'a' ? 'REDACTED' : result,
+	});
+	assert.equal(mapActual, 'new Map([\n\t[\'a\', REDACTED],\n\t[\'b\', 2]\n])');
+
+	const set = new Set(['a', 'b']);
+	const setActual = stringifyObject(set, {
+		transform: (object, item, result) => item === 'a' ? 'REDACTED' : result,
+	});
+	assert.equal(setActual, 'new Set([\n\tREDACTED,\n\t\'b\'\n])');
 });

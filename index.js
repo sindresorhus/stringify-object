@@ -2,22 +2,13 @@ import isRegexp from 'is-regexp';
 import isObject from 'is-obj';
 import getOwnEnumerableKeys from 'get-own-enumerable-keys';
 import isIdentifier from 'is-identifier';
+import quoteJsString from 'quote-js-string';
 
-const CHARACTER_ESCAPES = {
-	'\n': String.raw`\n`,
-	'\r': String.raw`\r`,
-	'\t': String.raw`\t`,
-	'\b': String.raw`\b`,
-	'\f': String.raw`\f`,
-	'\v': String.raw`\v`,
-	'\0': String.raw`\0`,
-};
-
-export default function stringifyObject(input, options, pad) {
+export default function stringifyObject(rootInput, rootOptions, rootPad) {
 	const seen = [];
 
 	return (function stringify(input, options = {}, pad = '') {
-		const indent = options.indent || '\t';
+		const indent = options.indent ?? '\t';
 
 		let tokens;
 		if (options.inlineCharacterLimit === undefined) {
@@ -36,7 +27,11 @@ export default function stringifyObject(input, options, pad) {
 			};
 		}
 
-		const expandWhiteSpace = string => {
+		if (seen.includes(input)) {
+			return '"[Circular]"';
+		}
+
+		const expandWhitespace = string => {
 			if (options.inlineCharacterLimit === undefined) {
 				return string;
 			}
@@ -54,13 +49,9 @@ export default function stringifyObject(input, options, pad) {
 			return string
 				.replaceAll(tokens.newline, '\n')
 				.replaceAll(tokens.newlineOrSpace, '\n')
-				.replaceAll(tokens.pad, pad)
-				.replaceAll(tokens.indent, pad + indent);
+				.replaceAll(tokens.pad, () => pad)
+				.replaceAll(tokens.indent, () => pad + indent);
 		};
-
-		if (seen.includes(input)) {
-			return '"[Circular]"';
-		}
 
 		const type = typeof input;
 
@@ -87,7 +78,7 @@ export default function stringifyObject(input, options, pad) {
 			}
 
 			// Check for well-known symbols first
-			if (description?.startsWith('Symbol.') && Symbol[description.slice(7)] === input) {
+			if (description.startsWith('Symbol.') && Symbol[description.slice(7)] === input) {
 				return description;
 			}
 
@@ -101,9 +92,8 @@ export default function stringifyObject(input, options, pad) {
 		}
 
 		if (input instanceof Date) {
-			return Number.isNaN(input.getTime())
-				? 'new Date(\'Invalid Date\')'
-				: `new Date('${input.toISOString()}')`;
+			const dateString = Number.isNaN(input.getTime()) ? 'Invalid Date' : input.toISOString();
+			return `new Date(${quoteJsString(dateString, options.singleQuotes === false ? '"' : '\'')})`;
 		}
 
 		if (input instanceof Map || input instanceof Set) {
@@ -119,15 +109,25 @@ export default function stringifyObject(input, options, pad) {
 			const items = [...input].map(item => {
 				if (isMap) {
 					const [key, value] = item;
-					return tokens.indent + `[${stringify(key, options, pad + indent)}, ${stringify(value, options, pad + indent)}]`;
+					let stringifiedValue = stringify(value, options, pad + indent);
+					if (options.transform) {
+						stringifiedValue = options.transform(input, key, stringifiedValue);
+					}
+
+					return tokens.indent + `[${stringify(key, options, pad + indent)}, ${stringifiedValue}]`;
 				}
 
-				return tokens.indent + stringify(item, options, pad + indent);
+				let value = stringify(item, options, pad + indent);
+				if (options.transform) {
+					value = options.transform(input, item, value);
+				}
+
+				return tokens.indent + value;
 			}).join(',' + tokens.newlineOrSpace);
 
 			seen.pop();
 
-			return expandWhiteSpace(`new ${name}([${tokens.newline}${items}${tokens.newline}${tokens.pad}])`);
+			return expandWhitespace(`new ${name}([${tokens.newline}${items}${tokens.newline}${tokens.pad}])`);
 		}
 
 		if (Array.isArray(input)) {
@@ -148,11 +148,12 @@ export default function stringifyObject(input, options, pad) {
 
 			seen.pop();
 
-			return expandWhiteSpace(`[${tokens.newline}${items}${tokens.newline}${tokens.pad}]`);
+			return expandWhitespace(`[${tokens.newline}${items}${tokens.newline}${tokens.pad}]`);
 		}
 
 		if (isObject(input)) {
-			let objectKeys = getOwnEnumerableKeys(input);
+			// `__proto__` sets the prototype instead of creating a property when the output is evaluated, so it's never safe to emit
+			let objectKeys = getOwnEnumerableKeys(input).filter(element => element !== '__proto__');
 
 			if (options.filter) {
 				// eslint-disable-next-line unicorn/no-array-callback-reference, unicorn/no-array-method-this-argument
@@ -187,20 +188,10 @@ export default function stringifyObject(input, options, pad) {
 
 			seen.pop();
 
-			return expandWhiteSpace(`{${tokens.newline}${pairs}${tokens.newline}${tokens.pad}}`);
+			return expandWhitespace(`{${tokens.newline}${pairs}${tokens.newline}${tokens.pad}}`);
 		}
 
 		// String escaping
-		const stringified = String(input)
-			.replaceAll('\\', '\\\\')
-			// eslint-disable-next-line no-control-regex
-			.replaceAll(/[\u0000-\u001F\u007F]/g, x =>
-				CHARACTER_ESCAPES[x] ?? `\\u${x.codePointAt(0).toString(16).padStart(4, '0')}`);
-
-		if (options.singleQuotes === false) {
-			return `"${stringified.replaceAll('"', String.raw`\"`)}"`;
-		}
-
-		return `'${stringified.replaceAll('\'', String.raw`\'`)}'`;
-	})(input, options, pad);
+		return quoteJsString(String(input), options.singleQuotes === false ? '"' : '\'');
+	})(rootInput, rootOptions, rootPad);
 }

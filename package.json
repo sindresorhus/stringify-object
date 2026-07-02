@@ -11,16 +11,20 @@
 		"url": "https://sindresorhus.com"
 	},
 	"type": "module",
-	"exports": "./index.js",
+	"exports": {
+		"types": "./index.d.ts",
+		"default": "./index.js"
+	},
 	"sideEffects": false,
 	"engines": {
-		"node": ">=20"
+		"node": ">=22"
 	},
 	"scripts": {
-		"test": "xo && ava"
+		"test": "xo && node --test test/index.js"
 	},
 	"files": [
-		"index.js"
+		"index.js",
+		"index.d.ts"
 	],
 	"keywords": [
 		"object",
@@ -36,11 +40,11 @@
 		"get-own-enumerable-keys": "^1.0.0",
 		"is-identifier": "^1.0.1",
 		"is-obj": "^3.0.0",
-		"is-regexp": "^3.1.0"
+		"is-regexp": "^3.1.0",
+		"quote-js-string": "^0.1.0"
 	},
 	"devDependencies": {
-		"ava": "^6.4.1",
-		"xo": "^1.2.2"
+		"xo": "^3.0.2"
 	},
 	"xo": {
 		"ignores": [
